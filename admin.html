@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IGYR - Admin Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .fade-in { animation: fadeIn 0.4s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .sidebar-item { transition: all 0.2s; cursor: pointer; }
+        .sidebar-item:hover, .sidebar-item.active { background-color: rgba(255, 255, 255, 0.1); border-left: 4px solid #3b82f6; }
+        
+        .section-content { display: none; }
+        .section-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100 flex h-screen overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 bg-gray-900 text-white flex flex-col h-full shadow-2xl">
+        <div class="p-6 border-b border-gray-800 flex flex-col items-center">
+            <img src="logo.jpg" alt="Logo" class="w-16 h-16 rounded-full border-2 border-white/20 mb-3 shadow-lg">
+            <h1 class="text-xl font-bold tracking-wide text-center">IGYR <span class="font-light block text-sm text-gray-400">Admin Hub</span></h1>
+        </div>
+        
+        <nav class="flex-1 py-6 space-y-2">
+            <div onclick="switchTab('dashboard')" id="tab-dashboard" class="sidebar-item active px-6 py-3 font-medium flex items-center">
+                <i class="fa-solid fa-cart-flatbed w-6 text-blue-400"></i> Active Orders
+            </div>
+            <div onclick="switchTab('payments')" id="tab-payments" class="sidebar-item px-6 py-3 font-medium flex items-center">
+                <i class="fa-solid fa-wallet w-6 text-emerald-400"></i> Phase Payments
+            </div>
+            <div onclick="switchTab('pending')" id="tab-pending" class="sidebar-item px-6 py-3 font-medium flex items-center">
+                <i class="fa-solid fa-user-clock w-6 text-yellow-400"></i> New Registrations
+            </div>
+            <div onclick="switchTab('pricing')" id="tab-pricing" class="sidebar-item px-6 py-3 font-medium flex items-center">
+                <i class="fa-solid fa-indian-rupee-sign w-6 text-green-400"></i> Pricing & Payment Info
+            </div>
+            <div onclick="switchTab('institutes')" id="tab-institutes" class="sidebar-item px-6 py-3 font-medium flex items-center">
+                <i class="fa-solid fa-building-columns w-6 text-purple-400"></i> Registered Institutes
+            </div>
+        </nav>
+        
+        <div class="p-6 border-t border-gray-800">
+            <a href="index.html" class="flex items-center text-red-400 hover:text-white text-sm font-bold transition-colors">
+                <i class="fa-solid fa-power-off w-6"></i> Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 h-full overflow-y-auto p-8 relative">
+        <div class="max-w-5xl mx-auto">
+            
+            <!-- Dashboard Section -->
+            <section id="sec-dashboard" class="section-content active fade-in">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-cart-flatbed mr-2 text-blue-600"></i> Active Orders</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- ACTIVE ORDERS -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="bg-blue-600 px-5 py-4">
+                            <h3 class="font-bold text-white"><i class="fa-solid fa-list-check mr-2"></i> Order Processing Pipeline</h3>
+                        </div>
+                        <div class="p-6 bg-gray-50 min-h-[300px]">
+                            <div id="post-payment-container" class="space-y-4">
+                                <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p>Loading...</p></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- APPROVED HUB / IDLE -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="bg-gray-800 px-5 py-4">
+                            <h3 class="font-bold text-white"><i class="fa-solid fa-building-circle-check mr-2 text-green-400"></i> Idle Approved Institutes</h3>
+                        </div>
+                        <div class="p-6 bg-gray-50 min-h-[300px]">
+                            <div id="approved-container" class="space-y-4"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Registered Institutes Section -->
+            <section id="sec-institutes" class="section-content fade-in">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-building-columns mr-2 text-purple-600"></i> Registered Institutes</h2>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-6 bg-gray-50 min-h-[400px]">
+                        <div id="registered-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="col-span-full text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p>Loading...</p></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal for Institute Details -->
+                <div id="institute-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col fade-in">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-building-circle-check mr-2 text-blue-600"></i> Institute Details</h3>
+                            <button onclick="document.getElementById('institute-modal').classList.replace('flex', 'hidden')" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+                        </div>
+                        <div id="institute-modal-content" class="p-6 overflow-y-auto">
+                            <!-- Content injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Payments Section -->
+            <section id="sec-payments" class="section-content fade-in">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-wallet mr-2 text-emerald-600"></i> Phase Payments & Ledgers</h2>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-6 bg-gray-50 min-h-[400px]">
+                        
+                        <div class="mb-4">
+                            <input type="text" id="payment-search" placeholder="Search by Institute ID or Name..." class="w-full md:w-1/2 p-3 border rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-emerald-500" onkeyup="filterPaymentsList()">
+                        </div>
+                        
+                        <div class="bg-white rounded border overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-800 text-white">
+                                    <tr>
+                                        <th class="p-3">IGYR ID</th>
+                                        <th class="p-3">Institute Name</th>
+                                        <th class="p-3">Status</th>
+                                        <th class="p-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="payments-list-container" class="divide-y">
+                                    <!-- Injected by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- Payment Ledger Modal -->
+                <div id="payment-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col fade-in">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-file-invoice mr-2 text-emerald-600"></i> Manage Ledger</h3>
+                            <button onclick="document.getElementById('payment-modal').classList.replace('flex', 'hidden')" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+                        </div>
+                        <div id="payment-modal-content" class="p-6 bg-gray-50">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Pending Registrations Section -->
+            <section id="sec-pending" class="section-content fade-in">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-user-clock mr-2 text-yellow-500"></i> New Registrations</h2>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-6 bg-gray-50 min-h-[400px]">
+                        <div id="application-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="col-span-full text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p>Loading...</p></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Pricing Section -->
+            <section id="sec-pricing" class="section-content fade-in">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-indian-rupee-sign mr-2 text-green-600"></i> Rate Card & Payment Details</h2>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-w-3xl">
+                    <div class="p-8">
+                        <form id="pricing-form" class="space-y-6">
+                            
+                            <div>
+                                <h3 class="text-lg font-bold border-b pb-2 mb-4">Pricing Configuration</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-500 mb-1">Normal (Per Student)</label>
+                                        <div class="relative"><span class="absolute left-3 top-2 text-gray-400 font-bold">₹</span><input type="number" id="price-normal" class="w-full pl-8 pr-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-500 mb-1">Excel (Per Student)</label>
+                                        <div class="relative"><span class="absolute left-3 top-2 text-gray-400 font-bold">₹</span><input type="number" id="price-excel" class="w-full pl-8 pr-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-gray-500 mb-1">Admit card + Any type of Tabulation</label>
+                                        <div class="relative"><span class="absolute left-3 top-2 text-gray-400 font-bold">₹</span><input type="number" id="price-both" class="w-full pl-8 pr-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-bold text-purple-600 mb-1">Subject Add-on (Per Subject)</label>
+                                        <div class="relative"><span class="absolute left-3 top-2 text-purple-400 font-bold">₹</span><input type="number" id="price-subject" class="w-full pl-8 pr-3 py-2 border border-purple-200 bg-purple-50 rounded focus:ring-2 focus:ring-purple-500 outline-none transition-all text-sm font-bold text-purple-700"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-8">
+                                <h3 class="text-lg font-bold border-b pb-2 mb-4">Payment Receiver Details (Visible to Clients)</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-500 mb-1">Bank Account Number</label>
+                                        <input type="text" id="bank-account" placeholder="e.g. 1234567890123" class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-gray-500 mb-1">IFSC Code</label>
+                                            <input type="text" id="bank-ifsc" placeholder="e.g. SBIN0001234" class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-gray-500 mb-1">UPI / Phone Number</label>
+                                            <input type="text" id="bank-phone" placeholder="e.g. 9876543210" class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-8">
+                                <h3 class="text-lg font-bold border-b pb-2 mb-4">Notice / Announcement Message (Visible to Clients)</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-500 mb-1">Message</label>
+                                        <textarea id="config-message" placeholder="Type a message to show on the Institute Dashboard..." class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none transition-all" rows="3"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-md mt-6">
+                                Save All Configuration
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+            
+        </div>
+    </main>
+
+    <script src="admin.js?v=1791127221"></script>
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active', 'border-l-4'));
+            document.getElementById('tab-' + tabId).classList.add('active', 'border-l-4');
+            
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            document.getElementById('sec-' + tabId).classList.add('active');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IGYR - India Get Your Result</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#0d47a1', 
+                        secondary: '#1976d2',
+                        accent: '#ff9800', 
+                        success: '#4caf50',
+                        danger: '#f44336'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 antialiased font-sans">
+    
+    <div id="app-container"></div>
+    <div id="toast-container" class="fixed bottom-5 right-5 space-y-3 z-50"></div>
+
+    <script src="india_data.js?v=4"></script>
+    <script src="app.js?v=1791127221"></script>
+</body>
+</html>
