@@ -1,4 +1,18 @@
-import sys
+import json
+
+vercel = {
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py?original_path=/api/$1"
+    }
+  ]
+}
+
+with open('vercel.json', 'w') as f:
+    json.dump(vercel, f, indent=2)
+
+api_index = """import sys
 import os
 import urllib.parse
 
@@ -23,3 +37,8 @@ class VercelWSGIMiddleware:
         return self.app(environ, start_response)
 
 app.wsgi_app = VercelWSGIMiddleware(app.wsgi_app)
+"""
+
+with open('api/index.py', 'w') as f:
+    f.write(api_index)
+

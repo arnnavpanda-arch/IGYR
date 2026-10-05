@@ -14,27 +14,7 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend requests
 
-@app.route('/', defaults={'path': 'index.html'})
-@app.route('/<path:path>')
-def serve_static(path):
-    import os
-    from flask import send_from_directory, jsonify
-    
-    # Check root directory first
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if os.path.exists(os.path.join(root_dir, path)):
-        return send_from_directory(root_dir, path)
-        
-    # Check frontend directory second (in case git didn't move them)
-    frontend_dir = os.path.join(root_dir, 'frontend')
-    if os.path.exists(os.path.join(frontend_dir, path)):
-        return send_from_directory(frontend_dir, path)
-        
-    return jsonify({"error": f"File not found: {path}"}), 404
 
-@app.errorhandler(404)
-def not_found(e):
-    return serve_static('index.html')
 
 
 
