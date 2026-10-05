@@ -1,3 +1,4 @@
+let lastAppDataHash = '';
 const API_BASE = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://127.0.0.1:5001/api' : '/api';
 // State Management
 const savedEmail = localStorage.getItem('igyr_session_email') || '';
@@ -54,7 +55,12 @@ function render() {
         default: content = getAuthView();
     }
 
-    appContainer.innerHTML = content;
+    if (typeof morphdom !== 'undefined') {
+        const wrap = (h, node) => `<${node.tagName.toLowerCase()} id="${node.id}" class="${node.className}">${h}</${node.tagName.toLowerCase()}>`;
+        morphdom(appContainer, wrap(content, appContainer));
+    } else {
+        appContainer.innerHTML = content;
+    }
     attachEventListeners();
 }
 
@@ -65,12 +71,12 @@ async function navigate(viewName) {
         try {
             // Fetch live pricing first (so it's independent)
             try {
-                const pRes = await fetch(`${API_BASE}/pricing`);
+                const pRes = await fetch(`${API_BASE}/pricing?t=${Date.now()}`);
                 if (pRes.ok) state.pricing = await pRes.json();
             } catch(e) {}
             
             // Fetch user status
-            const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}`);
+            const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}&t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 state.appStatus = data.status;
@@ -158,12 +164,12 @@ function getAuthView() {
 
     return `
     <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100 relative overflow-hidden">
-        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-        <div class="absolute top-[20%] right-[-10%] w-72 h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div class="absolute bottom-[-20%] left-[20%] w-80 h-80 bg-green-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+        <div class="absolute top-[-10%] left-[-10%] w-full max-w-sm h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-full max-w-xs h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-full max-w-xs md:max-w-sm h-80 bg-green-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
 
-        <div class="glass-panel w-full max-w-4xl flex flex-col md:flex-row rounded-[2rem] overflow-hidden shadow-3d relative z-10 fade-in border border-white/60">
-            <div class="md:w-1/2 bg-gradient-to-br from-primary via-blue-800 to-gray-900 text-white p-10 flex flex-col justify-center items-center text-center relative overflow-hidden">
+        <div class="glass-panel w-full max-w-4xl w-[95%] md:w-full flex flex-col md:flex-row rounded-[2rem] overflow-hidden shadow-3d relative z-10 fade-in border border-white/60">
+            <div class="w-full md:w-1/2 bg-gradient-to-br from-primary via-blue-800 to-gray-900 text-white p-10 flex flex-col justify-center items-center text-center relative overflow-hidden">
                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50"></div>
                <img src="logo.jpg" alt="IGYR Logo" class="w-44 h-44 rounded-full shadow-3d border-4 border-white/20 mb-8 transform hover:scale-105 transition duration-500 hover:rotate-3 relative z-10 object-cover" />
                <h2 class="text-4xl font-extrabold tracking-tight mb-2 shadow-sm text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200 relative z-10">IGYR Portal</h2>
@@ -171,7 +177,7 @@ function getAuthView() {
                <p class="mt-6 text-sm text-blue-200/80 leading-relaxed relative z-10">The premium platform for institutions to manage and publish results seamlessly across India.</p>
             </div>
 
-            <div class="md:w-1/2 bg-white/90 backdrop-blur-xl p-10 flex flex-col justify-center">
+            <div class="w-full md:w-1/2 bg-white/90 backdrop-blur-xl p-10 flex flex-col justify-center">
                 <div class="flex justify-between items-center mb-8 bg-gray-100 p-1.5 rounded-xl shadow-inner">
                     <button id="tab-login" class="flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${isLogin ? 'bg-white text-primary shadow-md transform scale-100' : 'text-gray-500 hover:text-gray-700 scale-95'}">Sign In</button>
                     <button id="tab-register" class="flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${!isLogin ? 'bg-white text-primary shadow-md transform scale-100' : 'text-gray-500 hover:text-gray-700 scale-95'}">Create Account</button>
@@ -346,13 +352,14 @@ function getDashboardView() {
     
     // Build Timeline HTML
     let timelineHtml = '';
-    const orderStates = ['order_placed', 'documents_required', 'processing', 'verification_pending', 'published'];
+    const orderStates = ['order_placed', 'documents_required', 'processing', 'verification_pending', 'ready_to_publish', 'published'];
     if (orderStates.includes(appStatus)) {
         const steps = [
             { id: 'order_placed', label: 'Order Placed', icon: 'fa-cart-shopping' },
             { id: 'documents_required', label: 'Upload Data', icon: 'fa-file-arrow-up' },
             { id: 'processing', label: 'Processing', icon: 'fa-gear' },
             { id: 'verification_pending', label: 'Verification', icon: 'fa-clipboard-check' },
+            { id: 'ready_to_publish', label: 'Approved', icon: 'fa-thumbs-up' },
             { id: 'published', label: 'Published', icon: 'fa-trophy' }
         ];
         
@@ -442,7 +449,7 @@ function getDashboardView() {
                     <i class="fa-solid fa-circle-info text-blue-500 mr-2"></i> Open your email inbox, review the attached PDF/Excel file, and then return here to authorize the final publication.
                 </div>
                 <div class="flex gap-3">
-                    <button id="btn-verify-approve" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-sm transition-colors"><i class="fa-solid fa-check mr-2"></i> Approve & Publish</button>
+                    <button id="btn-verify-approve" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-sm transition-colors"><i class="fa-solid fa-check mr-2"></i> Approve Tabulation</button>
                     <button id="btn-verify-reject" class="flex-1 bg-red-100 hover:bg-red-600 text-red-600 hover:text-white font-bold py-3 rounded-lg border border-red-200 shadow-sm transition-colors"><i class="fa-solid fa-xmark mr-2"></i> Reject (Changes Needed)</button>
                 </div>
             </div>
@@ -450,7 +457,7 @@ function getDashboardView() {
     }
     
     let paymentTrackerHtml = '';
-    const activeOrderStates = ['order_placed', 'documents_required', 'processing', 'verification_pending', 'published'];
+    const activeOrderStates = ['order_placed', 'documents_required', 'processing', 'verification_pending', 'ready_to_publish', 'published'];
     if (activeOrderStates.includes(appStatus) || (state.payments && state.payments.phases && state.payments.phases.length > 0)) {
         const payments = state.payments || {phases: []};
         const totalBilled = (payments.phases || []).reduce((acc, p) => acc + (p.debited || 0), 0);
@@ -630,43 +637,42 @@ function getDashboardView() {
     return `
     <div class="min-h-screen bg-gray-50 flex fade-in h-screen overflow-hidden">
         <!-- Sidebar -->
-        <aside class="w-64 bg-gray-900 text-white flex flex-col shadow-xl flex-shrink-0 h-full">
-            <div class="p-6 flex flex-col items-center border-b border-gray-800">
-                <img src="logo.jpg" alt="Logo" class="w-16 h-16 rounded-full border-4 border-gray-800 mb-3 shadow-lg" />
-                <span class="font-black text-xl tracking-wide">IGYR</span>
-                <span class="text-xs text-gray-400">Institute Portal</span>
+        <aside class="w-full md:w-64 bg-gray-900 text-white flex flex-row md:flex-col shadow-xl flex-shrink-0 md:h-full overflow-x-auto md:overflow-visible z-50">
+            <div class="p-4 md:p-6 flex flex-row md:flex-col items-center border-r md:border-r-0 md:border-b border-gray-800 flex-shrink-0">
+                <img src="logo.jpg" alt="Logo" class="w-10 h-10 md:w-16 md:h-16 rounded-full border-2 md:border-4 border-gray-800 mr-3 md:mr-0 md:mb-3 shadow-lg" />
+                <div><div class="font-black text-base md:text-xl tracking-wide">IGYR</div><div class="text-[10px] md:text-xs text-gray-400 leading-tight">Institute Portal</div></div>
             </div>
             
-            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-                <button data-tab="profile" class="sidebar-tab-btn w-full text-left px-5 py-3.5 rounded-xl transition-all duration-300 flex items-center ${
+            <nav class="flex-1 p-2 md:p-4 flex flex-row md:flex-col gap-2 md:space-y-2 overflow-x-auto md:overflow-y-auto items-center md:items-stretch">
+                <button data-tab="profile" class="sidebar-tab-btn w-auto md:w-full whitespace-nowrap text-left px-4 md:px-5 py-2 md:py-3.5 rounded-xl transition-all duration-300 flex items-center flex-shrink-0 text-sm md:text-base ${
                     state.activeTab === 'profile' 
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-900/40 translate-x-1 scale-105' 
                     : 'text-gray-400 font-medium hover:bg-gray-800 hover:text-white hover:translate-x-1'
                 }">
                     <i class="fa-solid fa-user mr-3 w-5 text-center"></i> Profile
                 </button>
-                <button data-tab="order_status" class="sidebar-tab-btn w-full text-left px-5 py-3.5 rounded-xl transition-all duration-300 flex items-center ${
+                <button data-tab="order_status" class="sidebar-tab-btn w-auto md:w-full whitespace-nowrap text-left px-4 md:px-5 py-2 md:py-3.5 rounded-xl transition-all duration-300 flex items-center flex-shrink-0 text-sm md:text-base ${
                     state.activeTab === 'order_status' 
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-900/40 translate-x-1 scale-105' 
                     : 'text-gray-400 font-medium hover:bg-gray-800 hover:text-white hover:translate-x-1'
                 }">
                     <i class="fa-solid fa-list-check mr-3 w-5 text-center"></i> Order Status
                 </button>
-                <button data-tab="pricing" class="sidebar-tab-btn w-full text-left px-5 py-3.5 rounded-xl transition-all duration-300 flex items-center ${
+                <button data-tab="pricing" class="sidebar-tab-btn w-auto md:w-full whitespace-nowrap text-left px-4 md:px-5 py-2 md:py-3.5 rounded-xl transition-all duration-300 flex items-center flex-shrink-0 text-sm md:text-base ${
                     state.activeTab === 'pricing' 
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-900/40 translate-x-1 scale-105' 
                     : 'text-gray-400 font-medium hover:bg-gray-800 hover:text-white hover:translate-x-1'
                 }">
                     <i class="fa-solid fa-tags mr-3 w-5 text-center"></i> Pricing Config
                 </button>
-                <button data-tab="payment" class="sidebar-tab-btn w-full text-left px-5 py-3.5 rounded-xl transition-all duration-300 flex items-center ${
+                <button data-tab="payment" class="sidebar-tab-btn w-auto md:w-full whitespace-nowrap text-left px-4 md:px-5 py-2 md:py-3.5 rounded-xl transition-all duration-300 flex items-center flex-shrink-0 text-sm md:text-base ${
                     state.activeTab === 'payment' 
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-900/40 translate-x-1 scale-105' 
                     : 'text-gray-400 font-medium hover:bg-gray-800 hover:text-white hover:translate-x-1'
                 }">
                     <i class="fa-solid fa-wallet mr-3 w-5 text-center"></i> Payment Tracking
                 </button>
-                <button data-tab="history" class="sidebar-tab-btn w-full text-left px-5 py-3.5 rounded-xl transition-all duration-300 flex items-center ${
+                <button data-tab="history" class="sidebar-tab-btn w-auto md:w-full whitespace-nowrap text-left px-4 md:px-5 py-2 md:py-3.5 rounded-xl transition-all duration-300 flex items-center flex-shrink-0 text-sm md:text-base ${
                     state.activeTab === 'history' 
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-900/40 translate-x-1 scale-105' 
                     : 'text-gray-400 font-medium hover:bg-gray-800 hover:text-white hover:translate-x-1'
@@ -765,7 +771,7 @@ function getDashboardView() {
         
         ${state.showWelcomeModal ? `
             <div class="fixed inset-0 bg-gray-50 z-50 flex flex-col items-center justify-center fade-in bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
-                <img src="logo.jpg" alt="Logo" class="w-72 h-72 mx-auto rounded-full border-[12px] border-white shadow-[0_20px_50px_rgba(37,99,235,0.3)] mb-12 animate-bounce object-cover" style="animation-duration: 3s;" />
+                <img src="logo.jpg" alt="Logo" class="w-full max-w-xs h-72 mx-auto rounded-full border-[12px] border-white shadow-[0_20px_50px_rgba(37,99,235,0.3)] mb-12 animate-bounce object-cover" style="animation-duration: 3s;" />
                 
                 <div class="flex justify-center w-full mb-12">
                     <h1 class="text-3xl md:text-5xl lg:text-6xl font-black overflow-hidden border-r-[6px] border-blue-600 whitespace-nowrap typing-animation text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600" 
@@ -1121,7 +1127,7 @@ function attachEventListeners() {
                     navigate('pending');
                 }
             } catch (err) {
-                alert('Failed to submit profile.');
+                showToast('Failed to submit profile.');
                 btn.innerHTML = 'Submit Details';
                 btn.disabled = false;
             }
@@ -1134,7 +1140,7 @@ function attachEventListeners() {
             if (state.view !== 'pending') { clearInterval(checkStatus); return; }
             
             try {
-                const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}`);
+                const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}&t=${Date.now()}`);
                 if (!res.ok) {
                     clearInterval(checkStatus);
                     state.errorMsg = 'Your registration was rejected and removed. Please try again with valid data.';
@@ -1159,25 +1165,25 @@ function attachEventListeners() {
     const cardNewResult = document.getElementById('card-new-result');
     if (cardNewResult) cardNewResult.addEventListener('click', async () => {
         try {
-            const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}`);
+            const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}&t=${Date.now()}`);
             if (!res.ok) {
-                alert('Your institution was removed from the hub. Please log out and sign back in to re-apply.');
+                showToast('Your institution was removed from the hub. Please log out and sign back in to re-apply.');
                 return;
             }
             const data = await res.json();
             
             if (data.status === 'pending') {
-                alert('Please wait for admin approval before publishing results.');
+                showToast('Please wait for admin approval before publishing results.');
                 return;
             }
             if (data.status === 'paid') {
-                alert('You already have an active order processing. Please wait for the admin team to finish.');
+                showToast('You already have an active order processing. Please wait for the admin team to finish.');
                 return;
             }
             
             navigate('nextSteps');
         } catch (e) {
-            alert('Failed to verify status.');
+            showToast('Failed to verify status.');
         }
     });
 
@@ -1215,11 +1221,11 @@ function attachEventListeners() {
             if (res.ok) {
                 setTimeout(() => navigate('dashboard'), 1000);
             } else {
-                alert('Order failed. Please contact support.');
+                showToast('Order failed. Please contact support.');
                 navigate('dashboard');
             }
         } catch(e) {
-            alert('Network error.');
+            showToast('Network error.');
         }
     });
 
@@ -1227,7 +1233,7 @@ function attachEventListeners() {
     const btnUpload = document.getElementById('btn-upload');
     if (btnUpload) btnUpload.addEventListener('click', async () => {
         const fileInput = document.getElementById('file-upload');
-        if(!fileInput.files.length) { alert('Please select a file!'); return; }
+        if(!fileInput.files.length) { showToast('Please select a file!'); return; }
         
         const formData = new FormData();
         formData.append('email', state.email);
@@ -1240,10 +1246,10 @@ function attachEventListeners() {
                 body: formData
             });
             if (res.ok) {
-                alert('Documents uploaded successfully!');
+                showToast('Documents uploaded successfully!');
                 navigate('dashboard');
             }
-        } catch(e) { alert('Upload failed'); }
+        } catch(e) { showToast('Upload failed'); }
     });
 
     // VERIFY TABULATION
@@ -1255,7 +1261,7 @@ function attachEventListeners() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ email: state.email, response: 'approve' })
             });
-            alert('Verified!'); navigate('dashboard');
+            showToast('Verified!'); navigate('dashboard');
         } catch(e) {}
     });
 
@@ -1269,7 +1275,7 @@ function attachEventListeners() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ email: state.email, response: 'reject', reason })
             });
-            alert('Rejection sent to admin.'); navigate('dashboard');
+            showToast('Rejection sent to admin.'); navigate('dashboard');
         } catch(e) {}
     });
 }
@@ -1284,7 +1290,7 @@ async function reapplyOrder() {
             body: JSON.stringify({email: state.email})
         });
         navigate('dashboard');
-    } catch(e) { alert('Failed'); }
+    } catch(e) { showToast('Failed'); }
 }
 
 window.printReceipt = (txnId) => {
@@ -1299,47 +1305,119 @@ window.printReceipt = (txnId) => {
     
     const instName = state.instituteData.name || 'Institute';
     
+    const instEmail = state.email || 'N/A';
+    const igyrId = state.igyr_id || 'N/A';
+    
+    // Determine the base URL for the logo so it loads correctly in the new window
+    const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+    
     const receiptHtml = `
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Payment Receipt - ${txnId}</title>
+        <title>Official Payment Receipt - ${txnId}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
-            .receipt-box { border: 1px solid #ccc; max-width: 600px; margin: 0 auto; padding: 40px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 8px; }
-            .header { text-align: center; border-bottom: 2px dashed #10b981; padding-bottom: 20px; margin-bottom: 30px; }
-            .header h1 { color: #10b981; margin: 0 0 10px 0; letter-spacing: 2px; }
-            .header p { margin: 0; color: #666; font-size: 14px; }
-            .details { margin-bottom: 40px; line-height: 1.8; }
-            .row { display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; padding: 12px 0; font-size: 15px; }
-            .footer { text-align: center; font-size: 12px; color: #999; margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; }
+            :root { --primary: #0ea5e9; --success: #10b981; --dark: #1e293b; --gray: #64748b; --light: #f1f5f9; }
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: var(--dark); background: #f8fafc; margin: 0; }
+            .receipt-box { background: white; border: 1px solid #e2e8f0; max-width: 700px; margin: 0 auto; padding: 50px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-radius: 12px; }
+            
+            .header-flex { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 30px; border-bottom: 2px solid var(--light); }
+            .brand-col { display: flex; flex-direction: column; }
+            .brand-title { font-size: 24px; font-weight: 800; color: var(--dark); margin: 0 0 5px 0; letter-spacing: -0.5px; }
+            .brand-subtitle { font-size: 14px; color: var(--gray); margin: 0; }
+            .logo-img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--light); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+            
+            .receipt-title { font-size: 32px; font-weight: 800; color: var(--success); margin: 0 0 5px 0; letter-spacing: 1px; text-transform: uppercase; }
+            .receipt-no { font-size: 14px; font-weight: 600; color: var(--gray); margin: 0; }
+            
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px; background: var(--light); padding: 25px; border-radius: 8px; }
+            .info-block { display: flex; flex-direction: column; }
+            .info-label { font-size: 12px; text-transform: uppercase; font-weight: 800; color: var(--gray); margin-bottom: 8px; letter-spacing: 1px; }
+            .info-val { font-size: 15px; font-weight: 600; color: var(--dark); }
+            
+            .table-container { margin-bottom: 40px; }
+            table { width: 100%; border-collapse: collapse; }
+            th { text-align: left; padding: 15px; background: var(--dark); color: white; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+            td { padding: 15px; border-bottom: 1px solid var(--light); font-size: 15px; font-weight: 600; }
+            .amount-col { text-align: right; }
+            
+            .total-row td { background: #f0fdf4; border-bottom: none; font-size: 18px; color: var(--success); }
+            .total-val { font-size: 24px; font-weight: 800; }
+            
+            .footer { text-align: center; font-size: 12px; color: var(--gray); margin-top: 50px; border-top: 2px dashed var(--light); padding-top: 30px; line-height: 1.6; }
+            .stamp { color: var(--success); font-weight: 800; font-size: 18px; letter-spacing: 2px; margin-bottom: 10px; display: inline-block; border: 2px solid var(--success); padding: 8px 20px; border-radius: 4px; transform: rotate(-5deg); opacity: 0.8; }
+            
             @media print {
-                body { padding: 0; }
+                body { padding: 0; background: white; }
                 .receipt-box { border: none; box-shadow: none; margin: 0; padding: 20px; max-width: 100%; }
+                .stamp { border: 2px solid #10b981; color: #10b981; }
             }
         </style>
     </head>
     <body>
         <div class="receipt-box">
-            <div class="header">
-                <h1>OFFICIAL RECEIPT</h1>
-                <p>India Get Your Result (IGYR)</p>
+            <div class="header-flex">
+                <div class="brand-col">
+                    <img src="${baseUrl}logo.jpg" alt="IGYR Logo" class="logo-img" onerror="this.style.display='none'">
+                    <h2 class="brand-title" style="margin-top: 15px;">India Get Your Result</h2>
+                    <p class="brand-subtitle">Official Result Publication Hub</p>
+                </div>
+                <div style="text-align: right;">
+                    <h1 class="receipt-title">RECEIPT</h1>
+                    <p class="receipt-no">#${txnId.replace('txn_', 'RCPT-').toUpperCase()}</p>
+                    <p style="font-size: 14px; font-weight: 600; color: var(--gray); margin-top: 10px;">Date: ${new Date(txn.date + (txn.date.endsWith('Z') ? '' : 'Z')).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12: true})}</p>
+                </div>
             </div>
-            <div class="details">
-                <div class="row"><strong>Receipt No:</strong> <span>${txnId.replace('txn_', 'RCPT-')}</span></div>
-                <div class="row"><strong>Date of Payment:</strong> <span>${new Date(txn.date).toLocaleString()}</span></div>
-                <div class="row"><strong>Received From:</strong> <span>${instName}</span></div>
-                <div class="row"><strong>Amount Paid:</strong> <span style="font-size: 1.3em; font-weight: bold; color: #10b981;">₹${txn.amount}</span></div>
-                <div class="row"><strong>Payment Towards:</strong> <span>${phaseName}</span></div>
-                <div class="row"><strong>Transaction Status:</strong> <span style="color: #10b981; font-weight: bold; text-transform: uppercase;">Successful</span></div>
+            
+            <div class="info-grid">
+                <div class="info-block">
+                    <span class="info-label">Billed To</span>
+                    <span class="info-val">${instName}</span>
+                    <span class="info-val" style="font-weight: 400; color: var(--gray); font-size: 14px; margin-top: 4px;">${instEmail}</span>
+                </div>
+                <div class="info-block">
+                    <span class="info-label">Institute Reference ID</span>
+                    <span class="info-val" style="font-family: monospace; font-size: 16px; background: white; padding: 4px 8px; border-radius: 4px; display: inline-block; border: 1px solid #e2e8f0; width: fit-content;">${igyrId}</span>
+                </div>
             </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th class="amount-col">Amount Paid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <div>Payment against billing phase:</div>
+                                <div style="font-size: 13px; color: var(--gray); font-weight: 400; margin-top: 4px;">${phaseName}</div>
+                            </td>
+                            <td class="amount-col">₹${txn.amount}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td style="text-align: right; font-weight: 800; text-transform: uppercase;">Total Received</td>
+                            <td class="amount-col total-val">₹${txn.amount}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px;">
+                <div class="stamp">PAID IN FULL</div>
+            </div>
+            
             <div class="footer">
-                <p>This is a computer-generated receipt and does not require a physical signature.</p>
-                <p>&copy; ${new Date().getFullYear()} India Get Your Result. All rights reserved.</p>
+                <p>This is a computer-generated official receipt and does not require a physical signature.</p>
+                <p><strong>Note:</strong> All payments are final and non-refundable once the publication process has begun.</p>
+                <p style="margin-top: 15px;">&copy; ${new Date().getFullYear()} India Get Your Result. All rights reserved.</p>
             </div>
         </div>
         <script>
-            window.onload = function() { setTimeout(() => { window.print(); }, 500); }
+            window.onload = function() { setTimeout(() => { window.print(); }, 800); }
         </script>
     </body>
     </html>
@@ -1350,9 +1428,67 @@ window.printReceipt = (txnId) => {
         printWindow.document.write(receiptHtml);
         printWindow.document.close();
     } else {
-        alert("Please allow popups to print the receipt.");
+        showToast("Please allow popups to print the receipt.");
     }
 };
 
 window.dismissWelcome = () => { console.log('dismissWelcome clicked'); state.showWelcomeModal = false; render(); };
 window.changeTab = (tabId) => { console.log('changeTab clicked', tabId); state.activeTab = tabId; render(); };
+
+
+window.showToast = function(msg) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed bottom-5 right-5 space-y-3 z-[9999]';
+        document.body.appendChild(container);
+    }
+    const isError = msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('error') || msg.toLowerCase().includes('reject') || msg.toLowerCase().includes('invalid');
+    const type = isError ? 'error' : 'success';
+    const toast = document.createElement('div');
+    const bg = type === 'error' ? 'bg-red-50 border-red-500 text-red-700' : 'bg-green-50 border-green-500 text-green-700';
+    const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check';
+    toast.className = `flex items-center p-4 mb-4 text-sm rounded-lg border-l-4 shadow-xl ${bg} transition-all duration-300 transform translate-y-10 opacity-0 min-w-[300px]`;
+    toast.innerHTML = `<i class="fa-solid ${icon} text-xl mr-3"></i><span class="font-bold">${msg}</span>`;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.remove('translate-y-10', 'opacity-0');
+    }, 10);
+    
+    setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+
+// Auto-poll for live real-time updates across multiple devices
+setInterval(async () => {
+    if (state.isLoggedIn && state.email && state.view === 'dashboard') {
+        try {
+            const res = await fetch(`${API_BASE}/institutes/status?email=${state.email}&t=${Date.now()}`);
+            if (res.ok) {
+                const data = await res.json();
+                
+                const currentHash = JSON.stringify(data);
+                if (lastAppDataHash === currentHash) return; 
+                lastAppDataHash = currentHash;
+                
+                state.appStatus = data.status;
+                if (data.institute && data.institute.name) {
+                    state.instituteData = data.institute;
+                }
+                state.igyr_id = data.igyr_id || '';
+                state.payments = data.payments || {total: 0, paid: 0, phases: []};
+                state.details = data.details || {};
+                state.tabulation_file = data.tabulation_file || null;
+                state.history = data.history || [];
+                state.rejection_reason = data.institute?.rejection_reason || data.rejection_reason || '';
+                
+                render(); // Soft re-render
+            }
+        } catch(e) {}
+    }
+}, 3000);

@@ -16,30 +16,34 @@
         .section-content { display: none; }
         .section-content.active { display: block; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/morphdom@2.7.1/dist/morphdom-umd.min.js"></script>
 </head>
-<body class="bg-gray-100 flex h-screen overflow-hidden">
+<body class="bg-gray-100 flex flex-col md:flex-row h-screen overflow-hidden">
 
     <!-- SIDEBAR -->
-    <aside class="w-64 bg-gray-900 text-white flex flex-col h-full shadow-2xl">
-        <div class="p-6 border-b border-gray-800 flex flex-col items-center">
-            <img src="logo.jpg" alt="Logo" class="w-16 h-16 rounded-full border-2 border-white/20 mb-3 shadow-lg">
+    <aside class="w-full md:w-64 bg-gray-900 text-white flex flex-row md:flex-col md:h-full shadow-2xl overflow-x-auto md:overflow-visible flex-shrink-0 border-b md:border-b-0 border-gray-800 z-50">
+        <div class="p-4 md:p-6 border-r md:border-r-0 md:border-b border-gray-800 flex flex-row md:flex-col items-center flex-shrink-0">
+            <img src="logo.jpg" alt="Logo" class="w-10 h-10 md:w-16 md:h-16 rounded-full border-2 border-white/20 md:mb-3 shadow-lg mr-3 md:mr-0">
             <h1 class="text-xl font-bold tracking-wide text-center">IGYR <span class="font-light block text-sm text-gray-400">Admin Hub</span></h1>
         </div>
         
         <nav class="flex-1 py-6 space-y-2">
-            <div onclick="switchTab('dashboard')" id="tab-dashboard" class="sidebar-item active px-6 py-3 font-medium flex items-center">
+            <div onclick="switchTab('publish')" id="tab-publish" class="sidebar-item px-4 md:px-6 py-2 md:py-3 font-medium flex items-center flex-shrink-0 whitespace-nowrap text-sm md:text-base">
+                <i class="fa-solid fa-cloud-arrow-up w-6 text-pink-400"></i> Publish Results
+            </div>
+            <div onclick="switchTab('dashboard')" id="tab-dashboard" class="sidebar-item active px-4 md:px-6 py-2 md:py-3 font-medium flex items-center flex-shrink-0 whitespace-nowrap text-sm md:text-base">
                 <i class="fa-solid fa-cart-flatbed w-6 text-blue-400"></i> Active Orders
             </div>
-            <div onclick="switchTab('payments')" id="tab-payments" class="sidebar-item px-6 py-3 font-medium flex items-center">
+            <div onclick="switchTab('payments')" id="tab-payments" class="sidebar-item px-4 md:px-6 py-2 md:py-3 font-medium flex items-center flex-shrink-0 whitespace-nowrap text-sm md:text-base">
                 <i class="fa-solid fa-wallet w-6 text-emerald-400"></i> Phase Payments
             </div>
-            <div onclick="switchTab('pending')" id="tab-pending" class="sidebar-item px-6 py-3 font-medium flex items-center">
+            <div onclick="switchTab('pending')" id="tab-pending" class="sidebar-item px-4 md:px-6 py-2 md:py-3 font-medium flex items-center flex-shrink-0 whitespace-nowrap text-sm md:text-base">
                 <i class="fa-solid fa-user-clock w-6 text-yellow-400"></i> New Registrations
             </div>
-            <div onclick="switchTab('pricing')" id="tab-pricing" class="sidebar-item px-6 py-3 font-medium flex items-center">
+            <div onclick="switchTab('pricing')" id="tab-pricing" class="sidebar-item px-4 md:px-6 py-2 md:py-3 font-medium flex items-center flex-shrink-0 whitespace-nowrap text-sm md:text-base">
                 <i class="fa-solid fa-indian-rupee-sign w-6 text-green-400"></i> Pricing & Payment Info
             </div>
-            <div onclick="switchTab('institutes')" id="tab-institutes" class="sidebar-item px-6 py-3 font-medium flex items-center">
+            <div onclick="switchTab('institutes')" id="tab-institutes" class="sidebar-item px-4 md:px-6 py-2 md:py-3 font-medium flex items-center flex-shrink-0 whitespace-nowrap text-sm md:text-base">
                 <i class="fa-solid fa-building-columns w-6 text-purple-400"></i> Registered Institutes
             </div>
         </nav>
@@ -52,58 +56,45 @@
     </aside>
 
     <!-- MAIN CONTENT -->
-    <main class="flex-1 h-full overflow-y-auto p-8 relative">
+    <main class="flex-1 h-full overflow-y-auto p-4 md:p-8 relative w-full">
         <div class="max-w-5xl mx-auto">
             
             <!-- Dashboard Section -->
             <section id="sec-dashboard" class="section-content active fade-in">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-cart-flatbed mr-2 text-blue-600"></i> Active Orders</h2>
                 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- ACTIVE ORDERS -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div class="bg-blue-600 px-5 py-4">
-                            <h3 class="font-bold text-white"><i class="fa-solid fa-list-check mr-2"></i> Order Processing Pipeline</h3>
-                        </div>
-                        <div class="p-6 bg-gray-50 min-h-[300px]">
-                            <div id="post-payment-container" class="space-y-4">
-                                <div class="text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p>Loading...</p></div>
-                            </div>
-                        </div>
+                <!-- FULL WIDTH PIPELINE -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 flex justify-between items-center">
+                        <h3 class="font-bold text-white text-lg"><i class="fa-solid fa-bars-progress mr-2"></i> Order Processing Pipeline</h3>
                     </div>
-                    
-                    <!-- APPROVED HUB / IDLE -->
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div class="bg-gray-800 px-5 py-4">
-                            <h3 class="font-bold text-white"><i class="fa-solid fa-building-circle-check mr-2 text-green-400"></i> Idle Approved Institutes</h3>
-                        </div>
-                        <div class="p-6 bg-gray-50 min-h-[300px]">
-                            <div id="approved-container" class="space-y-4"></div>
+                    <div class="p-4 md:p-6 bg-gray-50/50 min-h-[400px]">
+                        <div id="post-payment-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="col-span-full text-center text-gray-400 py-12"><i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i><p class="text-lg">Loading Pipeline...</p></div>
                         </div>
                     </div>
                 </div>
             </section>
             
             <!-- Registered Institutes Section -->
-            <section id="sec-institutes" class="section-content fade-in">
+                    <section id="sec-publish" class="section-content fade-in">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-cloud-arrow-up mr-2 text-pink-500"></i> Publish Results</h2>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-pink-50 px-5 py-4 border-b border-pink-100 flex justify-between items-center">
+                    <h3 class="font-bold text-pink-800">Institutes Ready for Publication</h3>
+                </div>
+                <div class="p-5" id="publish-list">
+                    <div class="text-gray-500 text-center py-8"><i class="fa-solid fa-spinner fa-spin text-2xl mb-3"></i><p>Loading...</p></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-institutes" class="section-content fade-in">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fa-solid fa-building-columns mr-2 text-purple-600"></i> Registered Institutes</h2>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="p-6 bg-gray-50 min-h-[400px]">
                         <div id="registered-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div class="col-span-full text-center text-gray-400 py-8"><i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><p>Loading...</p></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Modal for Institute Details -->
-                <div id="institute-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
-                    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col fade-in">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-building-circle-check mr-2 text-blue-600"></i> Institute Details</h3>
-                            <button onclick="document.getElementById('institute-modal').classList.replace('flex', 'hidden')" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
-                        </div>
-                        <div id="institute-modal-content" class="p-6 overflow-y-auto">
-                            <!-- Content injected by JS -->
                         </div>
                     </div>
                 </div>
@@ -135,19 +126,6 @@
                             </table>
                         </div>
                         
-                    </div>
-                </div>
-                
-                <!-- Payment Ledger Modal -->
-                <div id="payment-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
-                    <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col fade-in">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                            <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-file-invoice mr-2 text-emerald-600"></i> Manage Ledger</h3>
-                            <button onclick="document.getElementById('payment-modal').classList.replace('flex', 'hidden')" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
-                        </div>
-                        <div id="payment-modal-content" class="p-6 bg-gray-50">
-                            <!-- Injected by JS -->
-                        </div>
                     </div>
                 </div>
             </section>
@@ -232,9 +210,37 @@
             </section>
             
         </div>
+    
+                
+                <!-- Modal for Institute Details -->
+                <div id="institute-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-[95%] md:w-full max-h-[90vh] overflow-hidden flex flex-col fade-in">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-building-circle-check mr-2 text-blue-600"></i> Institute Details</h3>
+                            <button onclick="document.getElementById('institute-modal').classList.replace('flex', 'hidden')" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+                        </div>
+                        <div id="institute-modal-content" class="p-6 overflow-y-auto">
+                            <!-- Content injected by JS -->
+                        </div>
+                    </div>
+                </div>
+    
+                
+                <!-- Payment Ledger Modal -->
+                <div id="payment-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-xl w-[95%] md:w-full overflow-hidden flex flex-col fade-in">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-bold text-lg text-gray-800"><i class="fa-solid fa-file-invoice mr-2 text-emerald-600"></i> Manage Ledger</h3>
+                            <button onclick="document.getElementById('payment-modal').classList.replace('flex', 'hidden')" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+                        </div>
+                        <div id="payment-modal-content" class="p-6 bg-gray-50">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
     </main>
 
-    <script src="admin.js?v=1791127221"></script>
+    <script src="admin.js?v=2038"></script>
     <script>
         function switchTab(tabId) {
             document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active', 'border-l-4'));

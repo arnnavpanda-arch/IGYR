@@ -1,32 +1,45 @@
+let lastAdminDataHash = '';
 const API_BASE = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' ? 'http://127.0.0.1:5001/api' : '/api';
 
 async function loadApplication() {
     const pendingContainer = document.getElementById('application-container');
-    const approvedContainer = document.getElementById('approved-container');
+    
     const postContainer = document.getElementById('post-payment-container');
     const paymentsListContainer = document.getElementById('payments-list-container');
     const registeredContainer = document.getElementById('registered-container');
     
-    if (!pendingContainer || !approvedContainer || !postContainer) return;
+    if (!pendingContainer || !postContainer) return;
     
     try {
-        const res = await fetch(`${API_BASE}/admin/institutes`);
+        const res = await fetch(`${API_BASE}/admin/institutes?t=${Date.now()}`);
         const institutes = await res.json();
         
-        pendingContainer.innerHTML = '';
-        approvedContainer.innerHTML = '';
-        postContainer.innerHTML = '';
-        if (registeredContainer) registeredContainer.innerHTML = '';
-        if (paymentsListContainer) paymentsListContainer.innerHTML = '';
+        // Auto-refresh logic (only re-render if data actually changed)
+        const currentHash = JSON.stringify(institutes);
+        if (lastAdminDataHash === currentHash) return; // No changes, do not flicker UI
+        lastAdminDataHash = currentHash;
+        
+        let pendingHtml = '';
+        let postHtml = '';
+        let registeredHtml = '';
+        let paymentsListHtml = '';
+        const publishContainer = document.getElementById('publish-list');
+        if (publishContainer) publishContainer.innerHTML = '';
+        let publishInstitutes = [];
         
         window.allInstitutesData = institutes; // Store globally for modal
 
         institutes.forEach(inst => {
             // PENDING REGISTRATIONS
+
+            if (inst.status === 'ready_to_publish') {
+                publishInstitutes.push(inst);
+            }
+
             if (inst.status === 'pending') {
-                pendingContainer.innerHTML += `
+                pendingHtml += `
                     <div class="border rounded p-4 mb-2 bg-yellow-50">
-                        <p class="font-bold">${inst.institute.name}</p>
+                        <p class="font-bold">${inst.institute?.name || 'Unknown Institute'}</p>
                         <p class="text-sm">${inst.email}</p>
                         <button onclick="updateStatus('${inst.email}', 'approved')" class="bg-green-500 text-white px-3 py-1 rounded text-sm mt-2">Approve</button>
                     </div>`;
@@ -35,7 +48,7 @@ async function loadApplication() {
             // REGISTERED INSTITUTES TAB & PAYMENTS LIST
             if (inst.status !== 'pending' && inst.status !== 'removed') {
                 if (paymentsListContainer) {
-                    paymentsListContainer.innerHTML += `
+                    paymentsListHtml += `
                         <tr class="hover:bg-gray-50 payment-row">
                             <td class="p-3 font-mono text-xs payment-id">${inst.igyr_id || 'IGYR-WAITING'}</td>
                             <td class="p-3 font-bold payment-name">${inst.institute?.name || 'Unknown'}</td>
@@ -51,7 +64,7 @@ async function loadApplication() {
                 
                 if (registeredContainer) {
                 const totalPublished = (inst.history || []).length;
-                registeredContainer.innerHTML += `
+                registeredHtml += `
                     <div class="border rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow relative group cursor-pointer" onclick="showInstituteDetails('${inst.email}')">
                         <span class="absolute top-3 right-3 text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">
                             ${inst.igyr_id || 'IGYR-WAITING'}
@@ -71,14 +84,7 @@ async function loadApplication() {
                 }
             }
             
-            if (inst.status === 'approved' || inst.status === 'order_rejected') {
-                approvedContainer.innerHTML += `
-                    <div class="border rounded p-4 mb-2 bg-green-50">
-                        <p class="font-bold">${inst.institute.name}</p>
-                        <p class="text-sm">Status: Idle</p>
-                    </div>`;
-            }
-
+            
             // ACTIVE ORDERS & PAYMENTS (SPLIT)
             if (['order_placed', 'documents_required', 'processing', 'verification_pending', 'published'].includes(inst.status)) {
                 
@@ -110,35 +116,106 @@ async function loadApplication() {
                     actionsHtml = `<p class="text-xs text-orange-600 font-bold"><i class="fa-solid fa-clock"></i> Waiting for institute to approve tabulation...</p>`;
                 }
                 
-                let adminDocsHtml = (inst.status === 'verification_pending') ? `<div class="mt-2 text-xs p-2 bg-orange-50 rounded border border-orange-200"><span class="font-bold text-orange-700"><i class="fa-solid fa-envelope-circle-check"></i> Tabulation Register Sent to Client via Email</span></div>` : '';
                 
-                postContainer.innerHTML += `
-                    <div class="border rounded-xl p-5 mb-3 bg-white shadow-sm hover:shadow-md transition-shadow">
-                        <div class="flex justify-between items-start mb-2">
-                            <h4 class="font-bold text-gray-800 text-lg">${inst.institute?.name || 'Unknown'}</h4>
-                            <span class="uppercase font-bold text-[10px] bg-gray-100 text-gray-600 px-2 py-1 rounded">${inst.status}</span>
+                let badgeClass = 'bg-gray-100 text-gray-600';
+                let statusIcon = 'fa-circle-dot';
+                let statusText = inst.status.replace('_', ' ').toUpperCase();
+                
+                if(inst.status === 'order_placed') { badgeClass = 'bg-blue-100 text-blue-700'; statusIcon = 'fa-cart-plus'; statusText = 'FORMAT APPROVAL PENDING'; }
+                if(inst.status === 'documents_required') { badgeClass = 'bg-purple-100 text-purple-700'; statusIcon = 'fa-file-arrow-up'; statusText = 'WAITING FOR DATA UPLOAD'; }
+                if(inst.status === 'processing') { badgeClass = 'bg-orange-100 text-orange-700'; statusIcon = 'fa-gears'; statusText = 'IN PROCESSING'; }
+                if(inst.status === 'verification_pending') { badgeClass = 'bg-yellow-100 text-yellow-700'; statusIcon = 'fa-clipboard-check'; statusText = 'WAITING FOR VERIFICATION'; }
+                if(inst.status === 'ready_to_publish') { badgeClass = 'bg-pink-100 text-pink-700'; statusIcon = 'fa-cloud-arrow-up'; statusText = 'READY TO PUBLISH'; }
+                if(inst.status === 'published') { badgeClass = 'bg-green-100 text-green-700'; statusIcon = 'fa-check-double'; statusText = 'PUBLISHED'; }
+
+                let adminDocsHtml = (inst.status === 'verification_pending') ? `<div class="mt-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200 text-sm flex items-start gap-2"><i class="fa-solid fa-envelope-circle-check text-yellow-600 mt-0.5"></i><span class="text-yellow-800 font-medium">Tabulation Register Sent to Client via Email. Awaiting their approval.</span></div>` : '';
+                
+                let docsHtml = '';
+                if(inst.documents && inst.documents.length) {
+                    docsHtml = `<div class="mt-4"><p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2"><i class="fa-solid fa-folder-open text-blue-500 mr-1"></i> Client Uploaded Documents:</p><div class="flex flex-wrap gap-2">` + 
+                    inst.documents.map(d => `<a href="${API_BASE}/files/${d}" target="_blank" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium transition-colors border shadow-sm"><i class="fa-solid fa-file-arrow-down text-blue-600 mr-1"></i> ${d.substring(0,20)}...</a>`).join('') + 
+                    `</div></div>`;
+                }
+
+                postHtml += `
+                    <div class="bg-white rounded-2xl shadow-sm hover:shadow-lg border border-gray-100 overflow-hidden transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1">
+                        <!-- Card Header -->
+                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-start bg-gradient-to-br from-white to-gray-50">
+                            <div>
+                                <div class="mb-1 flex items-center gap-2 flex-wrap">
+                                    <span class="bg-gray-800 text-white text-[10px] px-2 py-0.5 rounded font-mono tracking-wider shadow-sm">${inst.igyr_id || 'IGYR-WAITING'}</span>
+                                    <h4 class="font-black text-gray-800 text-lg">${inst.institute?.name || 'Unknown Institute'}</h4>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <p class="text-xs text-gray-500 font-mono"><i class="fa-regular fa-envelope mr-1"></i> ${inst.email}</p>
+                                    <div onclick="showInstituteDetails('${inst.email}')" class="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline transition-colors flex items-center gap-1 cursor-pointer z-10 relative">
+                                        <i class="fa-solid fa-up-right-from-square"></i> View Profile
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider ${badgeClass} border border-opacity-50 border-current shadow-sm flex items-center gap-1 whitespace-nowrap">
+                                <i class="fa-solid ${statusIcon}"></i> ${statusText}
+                            </span>
                         </div>
                         
-                        <div class="my-3 bg-gray-50 border p-3 rounded-lg text-sm border-l-4 border-l-blue-500">
-                            <p class="mb-1"><strong>Output Format:</strong> ${inst.details?.option?.toUpperCase() || 'N/A'}</p>
-                            <p class="mb-1"><strong>Students:</strong> ${inst.details?.totalStudents || 0} | <strong>Subjects:</strong> ${inst.details?.totalSubjects || 0}</p>
-                            <p><strong>Exam Date:</strong> ${inst.details?.examDate || 'N/A'}</p>
+                        <!-- Order Details Grid -->
+                        <div class="p-6 flex-grow">
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Requested Format</span>
+                                    <span class="font-bold text-blue-700 text-sm bg-blue-50 px-2 py-0.5 rounded border border-blue-100">${inst.details?.option?.toUpperCase() || 'N/A'}</span>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Target Exam Date</span>
+                                    <span class="font-bold text-gray-700 text-sm"><i class="fa-regular fa-calendar text-blue-400 mr-1"></i> ${inst.details?.examDate || 'N/A'}</span>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Students</span>
+                                    <span class="font-black text-gray-800 text-lg">${inst.details?.totalStudents || 0}</span>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Subjects</span>
+                                    <span class="font-black text-gray-800 text-lg">${inst.details?.totalSubjects || 0}</span>
+                                </div>
+                            </div>
+                            
+                            ${docsHtml}
+                            ${adminDocsHtml}
                         </div>
                         
-                        ${inst.documents && inst.documents.length ? `<div class="mt-3 text-xs p-2 bg-gray-50 rounded border"><span class="font-bold text-gray-700"><i class="fa-solid fa-folder-open text-yellow-500 mr-1"></i> Client Uploads: </span><br>` + inst.documents.map(d => `<a href="${API_BASE}/files/${d}" target="_blank" class="text-blue-600 underline hover:text-blue-800 ml-1 block mt-1"><i class="fa-solid fa-file-arrow-down"></i> ${d}</a>`).join('') + `</div>` : ''}
-                        ${adminDocsHtml}
-                        
-                        <div class="mt-4">
+                        <!-- Action Footer -->
+                        <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 mt-auto">
                             ${actionsHtml}
                         </div>
                     </div>
                 `;
 
 
+
             }
+
         });
+        
+        if (typeof morphdom !== 'undefined') {
+            const wrap = (html, node) => `<${node.tagName.toLowerCase()} id="${node.id}" class="${node.className}">${html}</${node.tagName.toLowerCase()}>`;
+            
+            morphdom(pendingContainer, wrap(pendingHtml, pendingContainer));
+            morphdom(postContainer, wrap(postHtml, postContainer));
+            if (registeredContainer) morphdom(registeredContainer, wrap(registeredHtml, registeredContainer));
+            if (paymentsListContainer) morphdom(paymentsListContainer, wrap(paymentsListHtml, paymentsListContainer));
+        } else {
+            pendingContainer.innerHTML = pendingHtml;
+            postContainer.innerHTML = postHtml;
+            if (registeredContainer) registeredContainer.innerHTML = registeredHtml;
+            if (paymentsListContainer) paymentsListContainer.innerHTML = paymentsListHtml;
+        }
+        
+        if (typeof renderPublishList === 'function') {
+            renderPublishList(publishInstitutes);
+        }
     } catch (e) {
-        pendingContainer.innerHTML = `Error`;
+
+        console.error(e); pendingContainer.innerHTML = `Error: ` + e.message;
     }
 }
 
@@ -150,15 +227,15 @@ async function updateStatus(email, newStatus) {
             body: JSON.stringify({ email, status: newStatus })
         });
         loadApplication();
-    } catch(e) { alert('Action failed'); }
+    } catch(e) { showToast('Action failed'); }
 }
 
 async function removeInstitute(email) {
-    if(confirm("Are you sure you want to remove this institute from the hub?")) {
+    if(await confirmAction("Are you sure you want to remove this institute from the hub?")) {
         try {
             await fetch(`${API_BASE}/admin/remove?email=${email}`, { method: 'DELETE' });
             loadApplication();
-        } catch(e) { alert('Action failed'); }
+        } catch(e) { showToast('Action failed'); }
     }
 }
 
@@ -169,9 +246,9 @@ async function markTaskDone(email) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ email })
         });
-        alert("Task marked as completed! The client can now submit new results.");
+        showToast("Task marked as completed! The client can now submit new results.");
         loadApplication();
-    } catch(e) { alert('Action failed'); }
+    } catch(e) { showToast('Action failed'); }
 }
 
 document.addEventListener('DOMContentLoaded', loadApplication);
@@ -187,7 +264,7 @@ async function approveFormat(email) {
 async function addPhase(email) {
     const name = document.getElementById(`phase-name-${email}`).value || 'New Phase';
     const amount = parseInt(document.getElementById(`phase-amt-${email}`).value) || 0;
-    if (amount <= 0) return alert("Enter valid billed amount");
+    if (amount <= 0) return showToast("Enter valid billed amount");
     
     await fetch(`${API_BASE}/admin/add-phase`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -200,7 +277,7 @@ async function addPhase(email) {
 async function creditPhase(email) {
     const phase_id = document.getElementById(`sel-phase-${email}`).value;
     const amount = parseInt(document.getElementById(`credit-amt-${email}`).value) || 0;
-    if (amount <= 0) return alert("Enter valid paid amount");
+    if (amount <= 0) return showToast("Enter valid paid amount");
     
     await fetch(`${API_BASE}/admin/credit-phase`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -215,7 +292,7 @@ async function sendVerification(email) {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({email})
     });
-    alert('Verification requested');
+    showToast('Verification requested');
     loadApplication();
 }
 
@@ -259,8 +336,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(p)
                 });
-                alert('Rate Card Updated for Clients!');
-            } catch(e) { alert('Failed to update'); }
+                showToast('Rate Card Updated for Clients!');
+            } catch(e) { showToast('Failed to update'); }
         });
     }
 });
@@ -268,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function sendVerificationWithFile(email) {
     const fileInput = document.getElementById(`file-${email}`);
     if (!fileInput.files.length) {
-        alert("Please select a file to send for verification!");
+        showToast("Please select a file to send for verification!");
         return;
     }
     const formData = new FormData();
@@ -283,13 +360,13 @@ async function sendVerificationWithFile(email) {
             body: formData
         });
         if (res.ok) {
-            alert('Tabulation sent to client for verification!');
+            showToast('Tabulation sent to client for verification!');
             loadApplication();
         } else {
-            alert('Failed to send tabulation');
+            showToast('Failed to send tabulation');
             btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i> Send';
         }
-    } catch(e) { alert('Upload error'); }
+    } catch(e) { showToast('Upload error'); }
 }
 
 async function rejectOrder(email) {
@@ -302,14 +379,18 @@ async function rejectOrder(email) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({email, reason})
         });
-        alert('Order rejected and email sent.');
+        showToast('Order rejected and email sent.');
         loadApplication();
-    } catch(e) { alert('Action failed'); }
+    } catch(e) { showToast('Action failed'); }
 }
 
 function showInstituteDetails(email) {
+    console.log("showInstituteDetails called with:", email);
     const inst = window.allInstitutesData.find(i => i.email === email);
-    if(!inst) return;
+    if(!inst) {
+        console.error("Institute not found in window.allInstitutesData:", email);
+        return;
+    }
     
     const profile = inst.institute || {};
     const totalPublished = (inst.history || []).length;
@@ -345,7 +426,7 @@ function showInstituteDetails(email) {
                 </div>
                 <div class="w-px h-10 bg-blue-200"></div>
                 <div class="flex-1 text-center">
-                    <span class="block text-2xl font-black text-blue-600">${(inst.history || []).reduce((acc, h) => acc + (h.details?.totalStudents || 0), 0)}</span>
+                    <span class="block text-2xl font-black text-blue-600">${(inst.history || []).reduce((acc, h) => acc + parseInt(h.details?.totalStudents || 0), 0)}</span>
                     <span class="text-xs text-blue-800 uppercase font-bold">Total Students Processed</span>
                 </div>
             </div>
@@ -400,19 +481,23 @@ function openPaymentModal(email) {
         
         <div class="border border-gray-200 bg-white rounded-xl p-4">
             <p class="text-xs font-bold mb-2 text-red-700"><i class="fa-solid fa-file-invoice"></i> 1. Create New Bill Phase</p>
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="phase-name-${inst.email}" placeholder="Phase Name" class="border p-2 text-sm flex-1 rounded bg-gray-50">
-                <input type="number" id="phase-amt-${inst.email}" placeholder="Billed Amt" class="border p-2 text-sm w-24 rounded bg-gray-50">
-                <button onclick="addPhase('${inst.email}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm transition-colors">Create</button>
+            <div class="flex flex-col md:flex-row gap-2 mb-3">
+                <input type="text" id="phase-name-${inst.email}" placeholder="Phase Name" class="border p-2 text-sm flex-1 rounded bg-gray-50 w-full">
+                <div class="flex gap-2 w-full md:w-auto">
+                    <input type="number" id="phase-amt-${inst.email}" placeholder="Billed Amt" class="border p-2 text-sm flex-1 md:w-24 rounded bg-gray-50">
+                    <button onclick="addPhase('${inst.email}')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 md:px-3 md:py-1 rounded text-sm font-bold shadow-sm transition-colors whitespace-nowrap">Create</button>
+                </div>
             </div>
             
             ${phaseOptions ? `
             <div class="border-t pt-3 mt-1 border-gray-200">
                 <p class="text-xs font-bold mb-2 text-green-700"><i class="fa-solid fa-money-bill-wave"></i> 2. Log Payment for a Phase</p>
-                <div class="flex gap-2">
-                    <select id="sel-phase-${inst.email}" class="border p-2 text-sm flex-1 rounded bg-gray-50">${phaseOptions}</select>
-                    <input type="number" id="credit-amt-${inst.email}" placeholder="Paid Amt" class="border p-2 text-sm w-24 rounded bg-gray-50">
-                    <button onclick="creditPhase('${inst.email}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm font-bold shadow-sm transition-colors">Credit</button>
+                <div class="flex flex-col md:flex-row gap-2">
+                    <select id="sel-phase-${inst.email}" class="border p-2 text-sm flex-1 rounded bg-gray-50 w-full">${phaseOptions}</select>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <input type="number" id="credit-amt-${inst.email}" placeholder="Paid Amt" class="border p-2 text-sm flex-1 md:w-24 rounded bg-gray-50">
+                        <button onclick="creditPhase('${inst.email}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 md:px-3 md:py-1 rounded text-sm font-bold shadow-sm transition-colors whitespace-nowrap">Credit</button>
+                    </div>
                 </div>
             </div>
             ` : ''}
@@ -430,14 +515,133 @@ function openPaymentModal(email) {
 }
 
 async function clearOrder(email) {
-    if(!confirm("Are you sure? This will archive the order and reset the client's dashboard.")) return;
+    if(!(await confirmAction("This will archive the order and reset the client's dashboard. Do you want to continue?"))) return;
     try {
         await fetch(`${API_BASE}/admin/mark-task-done`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({email})
         });
-        alert('Order archived and cleared successfully!');
+        showToast('Order archived and cleared successfully!');
         document.getElementById('payment-modal').classList.replace('flex', 'hidden');
         loadApplication();
-    } catch(e) { alert('Failed'); }
+    } catch(e) { showToast('Failed'); }
 }
+
+
+function renderPublishList(institutes) {
+    const container = document.getElementById('publish-list');
+    if (institutes.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa-solid fa-check-circle text-4xl mb-3 text-gray-300"></i><p>No institutes are currently waiting for publication.</p></div>';
+        return;
+    }
+    
+    let html = '<div class="grid grid-cols-1 gap-4">';
+    institutes.forEach(inst => {
+        html += `
+            <div class="border rounded-lg p-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50 hover:bg-pink-50 transition-colors">
+                <div>
+                    <h4 class="font-bold text-gray-800 text-lg">${inst.name || 'Unknown'}</h4>
+                    <p class="text-sm text-gray-600"><i class="fa-solid fa-envelope mr-1"></i> ${inst.email}</p>
+                    <p class="text-xs font-semibold text-emerald-600 mt-1"><i class="fa-solid fa-circle-check mr-1"></i> Tabulation Register Approved by Institute</p>
+                </div>
+                <button onclick="publishResults('${inst.email}')" class="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-6 py-2.5 rounded-lg shadow-md hover:shadow-lg font-bold transition-all transform hover:-translate-y-0.5 whitespace-nowrap">
+                    <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Publish Results
+                </button>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function publishResults(email) {
+    if (!(await confirmAction('Are you sure you want to officially PUBLISH the results for this institute? This will immediately send an email notification to them with their final data.'))) return;
+    
+    try {
+        const res = await fetch(`${API_BASE}/admin/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            showToast('Results published successfully! Email notification sent.');
+            loadApplication();
+        } else {
+            showToast(data.error || 'Failed to publish results');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('Server connection failed');
+    }
+}
+
+
+window.showToast = function(msg) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed bottom-5 right-5 space-y-3 z-[9999]';
+        document.body.appendChild(container);
+    }
+    const isError = msg.toLowerCase().includes('fail') || msg.toLowerCase().includes('error') || msg.toLowerCase().includes('reject') || msg.toLowerCase().includes('invalid');
+    const type = isError ? 'error' : 'success';
+    const toast = document.createElement('div');
+    const bg = type === 'error' ? 'bg-red-50 border-red-500 text-red-700' : 'bg-green-50 border-green-500 text-green-700';
+    const icon = type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check';
+    toast.className = `flex items-center p-4 mb-4 text-sm rounded-lg border-l-4 shadow-xl ${bg} transition-all duration-300 transform translate-y-10 opacity-0 min-w-[300px]`;
+    toast.innerHTML = `<i class="fa-solid ${icon} text-xl mr-3"></i><span class="font-bold">${msg}</span>`;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.remove('translate-y-10', 'opacity-0');
+    }, 10);
+    
+    setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+
+window.confirmAction = function(message) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/60 z-[10000] flex items-center justify-center fade-in backdrop-blur-sm p-4';
+        
+        const modal = document.createElement('div');
+        modal.className = 'bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all';
+        
+        modal.innerHTML = `
+            <div class="p-6">
+                <div class="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                    <i class="fa-solid fa-circle-question animate-pulse"></i>
+                </div>
+                <h3 class="text-xl font-bold text-center text-gray-800 mb-2">Are you sure?</h3>
+                <p class="text-gray-600 text-center mb-6 leading-relaxed">${message}</p>
+                <div class="flex gap-3">
+                    <button id="btn-confirm-no" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-xl transition-colors">Cancel</button>
+                    <button id="btn-confirm-yes" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-0.5">Yes, Proceed</button>
+                </div>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        document.getElementById('btn-confirm-no').onclick = () => {
+            overlay.remove();
+            resolve(false);
+        };
+        
+        document.getElementById('btn-confirm-yes').onclick = () => {
+            overlay.remove();
+            resolve(true);
+        };
+    });
+}
+
+// Auto-poll for live real-time updates across multiple devices
+setInterval(loadApplication, 3000);
